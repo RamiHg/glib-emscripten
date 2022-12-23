@@ -74,6 +74,7 @@
 #include <glib/grcbox.h>
 #include <glib/grefcount.h>
 #include <glib/grefstring.h>
+#include <glib/gregex.h>
 #include <glib/gscanner.h>
 #include <glib/gsequence.h>
 #include <glib/gshell.h>
@@ -81,8 +82,8 @@
 #include <glib/gslist.h>
 #include <glib/gspawn.h>
 #include <glib/gstrfuncs.h>
-#include <glib/gstringchunk.h>
 #include <glib/gstring.h>
+#include <glib/gstringchunk.h>
 #include <glib/gstrvbuilder.h>
 #include <glib/gtestutils.h>
 #include <glib/gthread.h>

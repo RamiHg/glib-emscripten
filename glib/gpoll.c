@@ -83,6 +83,11 @@
 #include "gprintf.h"
 #endif
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <emscripten/threading.h>
+#endif
+
 #ifdef G_MAIN_POLL_DEBUG
 extern gboolean _g_main_poll_debug;
 #endif
@@ -124,6 +129,25 @@ g_poll (GPollFD *fds,
 	guint    nfds,
 	gint     timeout)
 {
+#ifdef __EMSCRIPTEN__
+  // Emscripten does not have synchronous polling capabilities. So we simulate
+  // it here.
+  if (timeout != 0) {
+    gint remaining_timeout = timeout;
+    do {
+      gint result = poll ((struct pollfd *)fds, nfds, 0);
+      // Either error-out immediately, or if we have results, return them now.
+      if (result != 0) return result;
+      // Otherwise, there is no data (yet). Sleep for a millisecond (smallest
+      // granularity).
+      // TODO: Check for pthreads, if so, can probably do a smaller granularity.
+      emscripten_thread_sleep(1);
+      remaining_timeout -= 1;
+    } while (remaining_timeout > 0 || timeout < 0);
+    // We've waited all we can.
+    return 0;
+  }
+#endif
   return poll ((struct pollfd *)fds, nfds, timeout);
 }
 

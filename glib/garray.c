@@ -830,6 +830,14 @@ g_array_remove_range (GArray *farray,
   return farray;
 }
 
+static gint
+array_sort_to_data_trampoline (gconstpointer a, gconstpointer b, gpointer userdata)
+{
+  // Store the actual compare func in userdata.
+  GCompareFunc compare_func = (GCompareFunc) userdata;
+  return compare_func (a, b);
+}
+
 /**
  * g_array_sort:
  * @array: a #GArray
@@ -855,8 +863,8 @@ g_array_sort (GArray       *farray,
     g_qsort_with_data (array->data,
                        array->len,
                        array->elt_size,
-                       (GCompareDataFunc)compare_func,
-                       NULL);
+                       array_sort_to_data_trampoline,
+                       (gpointer)compare_func);
 }
 
 /**

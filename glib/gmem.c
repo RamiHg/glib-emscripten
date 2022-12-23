@@ -61,6 +61,20 @@
 #include "gthread.h"
 #include "glib_trace.h"
 
+#ifdef __EMSCRIPTEN__
+// malloc returns 16-byte aligned addresses on 64-bit platforms. Most code
+// therefore assumes an 16-byte aligned malloc. To support 64-bit code, we will
+// manually force alignment to 16 bytes.
+// TODO: Maybe have this as a toggle for people that really don't want this.
+#include <stdio.h>
+
+#define system_malloc(size) aligned_alloc(16, size)
+#define system_calloc(n, size) g_aligned_alloc0(n, size, 16)
+
+#else
+#define FORCE_ALIGN_16 (0)
+#endif
+
 /* notes on macros:
  * having G_DISABLE_CHECKS defined disables use of glib_mem_profiler_table and
  * g_mem_profile().
@@ -127,7 +141,7 @@ g_malloc (gsize n_bytes)
     {
       gpointer mem;
 
-      mem = malloc (n_bytes);
+      mem = system_malloc (n_bytes);
       TRACE (GLIB_MEM_ALLOC((void*) mem, (unsigned int) n_bytes, 0, 0));
       if (mem)
 	return mem;
@@ -160,7 +174,7 @@ g_malloc0 (gsize n_bytes)
     {
       gpointer mem;
 
-      mem = calloc (1, n_bytes);
+      mem = system_calloc (1, n_bytes);
       TRACE (GLIB_MEM_ALLOC((void*) mem, (unsigned int) n_bytes, 1, 0));
       if (mem)
 	return mem;
@@ -199,6 +213,17 @@ g_realloc (gpointer mem,
   if (G_LIKELY (n_bytes))
     {
       newmem = realloc (mem, n_bytes);
+      // It's unclear how often the Emscripten allocator will successfully re-
+      // use the same address. Let's be optimistic and only do a manual alloc if
+      // the pointer is no longer aligned.
+#ifdef __EMSCRIPTEN__
+      if ((unsigned long)newmem & 15) {
+        gpointer aligned_mem = g_aligned_alloc(1, n_bytes, 16);
+        memcpy(aligned_mem, newmem, n_bytes);
+        free(newmem);
+        newmem = aligned_mem
+      }
+#endif
       TRACE (GLIB_MEM_REALLOC((void*) newmem, (void*)mem, (unsigned int) n_bytes, 0));
       if (newmem)
 	return newmem;
@@ -283,7 +308,7 @@ g_try_malloc (gsize n_bytes)
   gpointer mem;
 
   if (G_LIKELY (n_bytes))
-    mem = malloc (n_bytes);
+    mem = system_malloc (n_bytes);
   else
     mem = NULL;
 
@@ -308,7 +333,7 @@ g_try_malloc0 (gsize n_bytes)
   gpointer mem;
 
   if (G_LIKELY (n_bytes))
-    mem = calloc (1, n_bytes);
+    mem = system_calloc (1, n_bytes);
   else
     mem = NULL;
 
@@ -334,8 +359,15 @@ g_try_realloc (gpointer mem,
 {
   gpointer newmem;
 
-  if (G_LIKELY (n_bytes))
+  if (G_LIKELY (n_bytes)) {
     newmem = realloc (mem, n_bytes);
+#ifdef __EMSCRIPTEN__
+    if ((unsigned long)newmem & 15) {
+      // TODO: Do the same thing as in realloc.
+      g_warning("Warning: g_try_realloc return unaligned pointer.\n");
+    }
+#endif
+  }
   else
     {
       newmem = NULL;

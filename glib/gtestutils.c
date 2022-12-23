@@ -2626,6 +2626,14 @@ g_test_set_nonfatal_assertions (void)
  * Since: 2.28
  */
 
+static void
+func_to_fixture_trampoline (gpointer fixture,
+                            gconstpointer user_data)
+{
+  GTestFunc actual_func = (GTestFunc) user_data;
+  actual_func ();
+}
+
 /**
  * g_test_add_func:
  * @testpath:  /-separated test case path name for the test.
@@ -2653,7 +2661,7 @@ g_test_add_func (const char *testpath,
   g_return_if_fail (testpath != NULL);
   g_return_if_fail (testpath[0] == '/');
   g_return_if_fail (test_func != NULL);
-  g_test_add_vtable (testpath, 0, NULL, NULL, (GTestFixtureFunc) test_func, NULL);
+  g_test_add_vtable (testpath, 0, test_func, NULL, func_to_fixture_trampoline, NULL);
 }
 
 /**
@@ -2665,6 +2673,19 @@ g_test_add_func (const char *testpath,
  *
  * Since: 2.28
  */
+
+struct DataFuncTrampolineCtx {
+  GTestDataFunc actual_func;
+  gconstpointer user_data;
+};
+
+static void
+data_func_to_fixture_trampoline (gpointer fixture,
+                            gconstpointer user_data)
+{
+  const struct DataFuncTrampolineCtx *ctx = user_data;
+  ctx->actual_func (ctx->user_data);
+}
 
 /**
  * g_test_add_data_func:
@@ -2689,15 +2710,20 @@ g_test_add_func (const char *testpath,
  * Since: 2.16
  */
 void
-g_test_add_data_func (const char     *testpath,
-                      gconstpointer   test_data,
-                      GTestDataFunc   test_func)
+g_test_add_data_func (const char *testpath,
+                      gconstpointer test_data,
+                      GTestDataFunc test_func)
 {
   g_return_if_fail (testpath != NULL);
   g_return_if_fail (testpath[0] == '/');
   g_return_if_fail (test_func != NULL);
 
-  g_test_add_vtable (testpath, 0, test_data, NULL, (GTestFixtureFunc) test_func, NULL);
+  // TODO: Ctx leaks. Free it when we destroy fixture.
+  struct DataFuncTrampolineCtx *ctx = g_malloc (sizeof (*ctx));
+  ctx->actual_func = test_func;
+  ctx->user_data = test_data;
+
+  g_test_add_vtable (testpath, 0, ctx, NULL, (GTestFixtureFunc) data_func_to_fixture_trampoline, NULL);
 }
 
 /**
@@ -2722,8 +2748,13 @@ g_test_add_data_func_full (const char     *testpath,
   g_return_if_fail (testpath[0] == '/');
   g_return_if_fail (test_func != NULL);
 
-  g_test_add_vtable (testpath, 0, test_data, NULL,
-                     (GTestFixtureFunc) test_func,
+  // TODO: Ctx leaks. Free it when we destroy fixture.
+  struct DataFuncTrampolineCtx *ctx = g_malloc (sizeof (*ctx));
+  ctx->actual_func = test_func;
+  ctx->user_data = test_data;
+
+  g_test_add_vtable (testpath, 0, ctx, NULL,
+                     (GTestFixtureFunc) data_func_to_fixture_trampoline,
                      (GTestFixtureFunc) data_free_func);
 }
 
@@ -2884,6 +2915,11 @@ test_has_prefix (gconstpointer a,
     return g_strcmp0 (test_run_name_local, test_path_skipped_local);
 }
 
+static void test_case_free(gpointer ptr, gpointer user_data) {
+  (void)user_data;
+  g_free(ptr);
+}
+
 static gboolean
 test_case_run (GTestCase *tc)
 {
@@ -2958,7 +2994,7 @@ test_case_run (GTestCase *tc)
       g_timer_destroy (test_run_timer);
     }
 
-  g_slist_free_full (filename_free_list, g_free);
+  g_slist_free_full (filename_free_list, (GDestroyNotify)test_case_free);
   test_filename_free_list = old_free_list;
   g_free (test_uri_base);
   test_uri_base = old_base;
@@ -3135,6 +3171,20 @@ g_test_case_free (GTestCase *test_case)
   g_slice_free (GTestCase, test_case);
 }
 
+static void
+test_case_free_trampoline (gpointer data, gpointer userdata)
+{
+  (void) userdata;
+  g_test_case_free (data);
+}
+
+static void
+test_suite_free_trampoline (gpointer data, gpointer userdata)
+{
+  (void)userdata;
+  g_test_suite_free (data);
+}
+
 /**
  * g_test_suite_free:
  * @suite: a #GTestSuite
@@ -3146,11 +3196,11 @@ g_test_case_free (GTestCase *test_case)
 void
 g_test_suite_free (GTestSuite *suite)
 {
-  g_slist_free_full (suite->cases, (GDestroyNotify)g_test_case_free);
+  g_slist_free_full (suite->cases, (GDestroyNotify)test_case_free_trampoline);
 
   g_free (suite->name);
 
-  g_slist_free_full (suite->suites, (GDestroyNotify)g_test_suite_free);
+  g_slist_free_full (suite->suites, (GDestroyNotify)test_suite_free_trampoline);
 
   g_slice_free (GTestSuite, suite);
 }

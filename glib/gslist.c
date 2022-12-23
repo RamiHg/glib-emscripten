@@ -943,6 +943,14 @@ g_slist_insert_sorted_real (GSList   *list,
     }
 }
 
+static gint
+compare_data_func_trampoline (gconstpointer a, gconstpointer b, gpointer user_data)
+{
+  // Store the pointer to the real function in user_data.
+  GCompareFunc compare_func = (GCompareFunc) user_data;
+  return compare_func (a, b);
+}
+
 /**
  * g_slist_insert_sorted:
  * @list: a #GSList
@@ -956,12 +964,12 @@ g_slist_insert_sorted_real (GSList   *list,
  *
  * Returns: the new start of the #GSList
  */
-GSList*
-g_slist_insert_sorted (GSList       *list,
-                       gpointer      data,
-                       GCompareFunc  func)
+GSList *
+g_slist_insert_sorted (GSList *list,
+                       gpointer data,
+                       GCompareFunc func)
 {
-  return g_slist_insert_sorted_real (list, data, (GFunc) func, NULL);
+  return g_slist_insert_sorted_real (list, data, (GFunc) compare_data_func_trampoline, func);
 }
 
 /**
@@ -1065,10 +1073,10 @@ g_slist_sort_real (GSList   *list,
  * Returns: the start of the sorted #GSList
  */
 GSList *
-g_slist_sort (GSList       *list,
-              GCompareFunc  compare_func)
+g_slist_sort (GSList *list,
+              GCompareFunc compare_func)
 {
-  return g_slist_sort_real (list, (GFunc) compare_func, NULL);
+  return g_slist_sort_real (list, (GFunc) compare_data_func_trampoline, compare_func);
 }
 
 /**

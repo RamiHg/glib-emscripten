@@ -2016,6 +2016,11 @@ else
   libiconv = dependency('iconv')
 endif
 
+# pcre2 = dependency('libpcre2-8', required : true, fallback : ['pcre2', 'libpcre2_8'])
+pcre2 = dependency('libpcre2-8', required : true)
+use_pcre2_static_flag = true
+
+
 # Import the gvdb sources as a subproject to avoid having the copylib in-tree
 subproject('gvdb')
 gvdb_dep = dependency('gvdb')

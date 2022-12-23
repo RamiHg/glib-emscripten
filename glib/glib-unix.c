@@ -99,7 +99,8 @@ g_unix_open_pipe (int     *fds,
   /* We only support FD_CLOEXEC */
   g_return_val_if_fail ((flags & (FD_CLOEXEC)) == flags, FALSE);
 
-#ifdef HAVE_PIPE2
+  // pipe2 is not actually implemented in Emscripten.
+#if defined HAVE_PIPE2 && !defined __EMSCRIPTEN__
   {
     int pipe2_flags = 0;
     if (flags & FD_CLOEXEC)
@@ -175,6 +176,10 @@ g_unix_set_fd_nonblocking (gint       fd,
     }
   else
     {
+#ifdef __EMSCRIPTEN__
+      ferror("Cannot create blocking pipes in Emscripten.\n");
+      abort();
+#endif
 #ifdef O_NONBLOCK
       fcntl_flags &= ~O_NONBLOCK;
 #else

@@ -215,6 +215,7 @@ glib_sub_headers = files(
   'grcbox.h',
   'grefcount.h',
   'grefstring.h',
+  'gregex.h',
   'gscanner.h',
   'gsequence.h',
   'gshell.h',
@@ -302,6 +303,7 @@ glib_sources += files(
   'grcbox.c',
   'grefcount.c',
   'grefstring.c',
+  'gregex.c',
   'gscanner.c',
   'gsequence.c',
   'gshell.c',
@@ -361,7 +363,7 @@ if host_system == 'windows'
     glib_sources += files('dirent/wdirent.c')
   endif
 elif host_system == 'emscripten'
-  glib_sources += files('gspawn-wasm.c')
+  glib_sources += files('gspawn-wasm.c', 'giounix.c', 'glib-unix.c')
 else
   glib_sources += files('glib-unix.c', 'gspawn.c', 'giounix.c')
 endif
@@ -391,7 +393,8 @@ else
   glib_dtrace_hdr = []
 endif
 
-glib_c_args = ['-DG_LOG_DOMAIN="GLib"'] + glib_c_args_internal
+pcre2_static_args = ['-DPCRE2_STATIC']
+glib_c_args = ['-DG_LOG_DOMAIN="GLib"'] + glib_c_args_internal + pcre2_static_args
 libglib = library('glib-2.0',
   glib_dtrace_obj, glib_dtrace_hdr,
   sources : [deprecated_sources, glib_sources],
@@ -410,6 +413,7 @@ libglib = library('glib-2.0',
     libm,
     librt,
     libsysprof_capture_dep,
+    pcre2,
     platform_deps,
     thread_dep,
   ],
