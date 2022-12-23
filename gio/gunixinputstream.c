@@ -67,8 +67,10 @@ struct _GUnixInputStreamPrivate {
   guint can_poll : 1;
 };
 
-static void g_unix_input_stream_pollable_iface_init (GPollableInputStreamInterface *iface);
-static void g_unix_input_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface);
+static void g_unix_input_stream_pollable_iface_init (GPollableInputStreamInterface *iface,
+                                                     gpointer                       iface_data);
+static void g_unix_input_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface,
+                                                                  gpointer                   iface_data);
 
 G_DEFINE_TYPE_WITH_CODE (GUnixInputStream, g_unix_input_stream, G_TYPE_INPUT_STREAM,
                          G_ADD_PRIVATE (GUnixInputStream)
@@ -159,7 +161,8 @@ g_unix_input_stream_class_init (GUnixInputStreamClass *klass)
 }
 
 static void
-g_unix_input_stream_pollable_iface_init (GPollableInputStreamInterface *iface)
+g_unix_input_stream_pollable_iface_init (GPollableInputStreamInterface *iface,
+                                         gpointer                       iface_data)
 {
   iface->can_poll = g_unix_input_stream_pollable_can_poll;
   iface->is_readable = g_unix_input_stream_pollable_is_readable;
@@ -167,7 +170,8 @@ g_unix_input_stream_pollable_iface_init (GPollableInputStreamInterface *iface)
 }
 
 static void
-g_unix_input_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface)
+g_unix_input_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface,
+                                                      gpointer                   iface_data)
 {
   iface->get_fd = (int (*) (GFileDescriptorBased *))g_unix_input_stream_get_fd;
 }

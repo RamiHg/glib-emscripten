@@ -60,7 +60,8 @@ struct _GSimpleAction
 
 typedef GObjectClass GSimpleActionClass;
 
-static void g_simple_action_iface_init (GActionInterface *iface);
+static void g_simple_action_iface_init (GActionInterface *iface,
+                                        gpointer          iface_data);
 G_DEFINE_TYPE_WITH_CODE (GSimpleAction, g_simple_action, G_TYPE_OBJECT,
   G_IMPLEMENT_INTERFACE (G_TYPE_ACTION, g_simple_action_iface_init))
 
@@ -349,7 +350,8 @@ g_simple_action_init (GSimpleAction *simple)
 }
 
 void
-g_simple_action_iface_init (GActionInterface *iface)
+g_simple_action_iface_init (GActionInterface *iface,
+                            gpointer          iface_data)
 {
   iface->get_name = g_simple_action_get_name;
   iface->get_parameter_type = g_simple_action_get_parameter_type;

@@ -215,7 +215,6 @@ glib_sub_headers = files(
   'grcbox.h',
   'grefcount.h',
   'grefstring.h',
-  'gregex.h',
   'gscanner.h',
   'gsequence.h',
   'gshell.h',
@@ -303,7 +302,6 @@ glib_sources += files(
   'grcbox.c',
   'grefcount.c',
   'grefstring.c',
-  'gregex.c',
   'gscanner.c',
   'gsequence.c',
   'gshell.c',
@@ -362,9 +360,10 @@ if host_system == 'windows'
   if cc.get_id() == 'msvc' or cc.get_id() == 'clang-cl'
     glib_sources += files('dirent/wdirent.c')
   endif
+elif host_system == 'emscripten'
+  glib_sources += files('gspawn-wasm.c')
 else
   glib_sources += files('glib-unix.c', 'gspawn.c', 'giounix.c')
-  platform_deps = []
 endif
 
 if host_system == 'linux'
@@ -392,13 +391,7 @@ else
   glib_dtrace_hdr = []
 endif
 
-pcre2_static_args = []
-
-if use_pcre2_static_flag
-  pcre2_static_args = ['-DPCRE2_STATIC']
-endif
-
-glib_c_args = ['-DG_LOG_DOMAIN="GLib"'] + glib_c_args_internal + pcre2_static_args
+glib_c_args = ['-DG_LOG_DOMAIN="GLib"'] + glib_c_args_internal
 libglib = library('glib-2.0',
   glib_dtrace_obj, glib_dtrace_hdr,
   sources : [deprecated_sources, glib_sources],
@@ -417,7 +410,6 @@ libglib = library('glib-2.0',
     libm,
     librt,
     libsysprof_capture_dep,
-    pcre2,
     platform_deps,
     thread_dep,
   ],
@@ -475,7 +467,7 @@ if host_system == 'windows'
       include_directories : configinc,
       dependencies : [libglib_dep])
   endif
-else
+elif host_system != 'emscripten'
   gtester = executable('gtester', 'gtester.c',
     install : true,
     install_tag : 'bin-devel',

@@ -31,7 +31,7 @@
 
 #include "gsocket.h"
 
-#ifdef G_OS_UNIX
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
 #include "glib-unix.h"
 #endif
 
@@ -54,7 +54,7 @@
 # include <sys/filio.h>
 #endif
 
-#ifdef G_OS_UNIX
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
 #include <sys/uio.h>
 #endif
 
@@ -143,12 +143,14 @@
  * Since: 2.22
  */
 
-static void     g_socket_initable_iface_init (GInitableIface  *iface);
+static void     g_socket_initable_iface_init (GInitableIface  *iface,
+                                              gpointer         iface_data);
 static gboolean g_socket_initable_init       (GInitable       *initable,
 					      GCancellable    *cancellable,
 					      GError         **error);
 
-static void     g_socket_datagram_based_iface_init       (GDatagramBasedInterface *iface);
+static void     g_socket_datagram_based_iface_init       (GDatagramBasedInterface *iface,
+                                                          gpointer                 iface_data);
 static gint     g_socket_datagram_based_receive_messages (GDatagramBased  *self,
                                                           GInputMessage   *messages,
                                                           guint            num_messages,
@@ -708,9 +710,9 @@ g_socket_constructed (GObject *object)
 
   if (socket->priv->fd != -1)
     {
-#ifndef G_OS_WIN32
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
       GError *error = NULL;
-#else
+#elif defined(G_OS_WIN32)
       gulong arg;
 #endif
 
@@ -718,13 +720,13 @@ g_socket_constructed (GObject *object)
        * nonblocking automatically in certain operations. This way we make
        * things work the same on all platforms.
        */
-#ifndef G_OS_WIN32
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
       if (!g_unix_set_fd_nonblocking (socket->priv->fd, TRUE, &error))
         {
           g_warning ("Error setting socket nonblocking: %s", error->message);
           g_clear_error (&error);
         }
-#else
+#elif defined(G_OS_WIN32)
       arg = TRUE;
 
       if (ioctlsocket (socket->priv->fd, FIONBIO, &arg) == SOCKET_ERROR)
@@ -1103,13 +1105,15 @@ g_socket_class_init (GSocketClass *klass)
 }
 
 static void
-g_socket_initable_iface_init (GInitableIface *iface)
+g_socket_initable_iface_init (GInitableIface *iface,
+                              gpointer        iface_data)
 {
   iface->init = g_socket_initable_init;
 }
 
 static void
-g_socket_datagram_based_iface_init (GDatagramBasedInterface *iface)
+g_socket_datagram_based_iface_init (GDatagramBasedInterface *iface,
+                                    gpointer                 iface_data)
 {
   iface->receive_messages = g_socket_datagram_based_receive_messages;
   iface->send_messages = g_socket_datagram_based_send_messages;
@@ -4012,7 +4016,7 @@ socket_source_dispatch (GSource     *source,
     events = G_IO_NVAL;
   else
     events = update_condition (socket_source->socket);
-#else
+#elif defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
   if (g_socket_is_closed (socket_source->socket))
     {
       if (socket_source->fd_tag)
@@ -4150,7 +4154,7 @@ socket_source_new (GSocket      *socket,
   socket_source->pollfd.events = condition;
   socket_source->pollfd.revents = 0;
   g_source_add_poll (source, &socket_source->pollfd);
-#else
+#elif defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
   socket_source->fd_tag = g_source_add_unix_fd (source, socket->priv->fd, condition);
 #endif
 

@@ -48,7 +48,7 @@
 
 #include "glibintl.h"
 
-#ifdef G_OS_UNIX
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
 #include "glib-unix.h"
 #endif
 
@@ -603,7 +603,7 @@ static gboolean
 make_pipe (gint     pipe_fds[2],
            GError **error)
 {
-#if defined(G_OS_UNIX)
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
   return g_unix_open_pipe (pipe_fds, FD_CLOEXEC, error);
 #elif defined(G_OS_WIN32)
   if (_pipe (pipe_fds, 4096, _O_BINARY) < 0)

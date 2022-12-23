@@ -276,6 +276,9 @@ if host_system == 'windows'
 elif host_system == 'cygwin'
   glib_os = '''#define G_OS_UNIX
 #define G_WITH_CYGWIN'''
+elif host_system == 'emscripten'
+  glib_os = '''#define G_OS_UNIX
+#define G_PLATFORM_WASM'''
 else
   glib_os = '#define G_OS_UNIX'
 endif
@@ -472,7 +475,7 @@ foreach m : struct_members
 endforeach
 
 # Compiler flags
-if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
+if cc.get_id() == 'gcc' or cc.get_id() == 'clang' or cc.get_id() == 'emscripten'
   warning_common_args = [
     '-Wduplicated-branches',
     '-Wimplicit-fallthrough',
@@ -724,7 +727,7 @@ if host_system != 'windows' and cc.has_function('posix_memalign', prefix: '#incl
 endif
 
 # Check that posix_spawn() is usable; must use header
-if cc.has_function('posix_spawn', prefix : '#include <spawn.h>')
+if host_system != 'emscripten' and cc.has_function('posix_spawn', prefix : '#include <spawn.h>')
   glib_conf.set('HAVE_POSIX_SPAWN', 1)
 endif
 
@@ -1040,9 +1043,9 @@ if host_system == 'windows' and (cc.get_id() == 'msvc' or cc.get_id() == 'clang-
   glib_conf.set('HAVE_C99_SNPRINTF', false)
   glib_conf.set('HAVE_C99_VSNPRINTF', false)
   glib_conf.set('HAVE_UNIX98_PRINTF', false)
-elif not cc_can_run and host_system in ['ios', 'darwin']
-  # All these are true when compiling natively on macOS, so we should use good
-  # defaults when building for iOS and tvOS.
+elif not cc_can_run and host_system in ['ios', 'darwin', 'emscripten']
+  # All these are true when compiling natively on macOS, or when compiling with
+  # Emscripten (which uses musl libc internally).
   glib_conf.set('HAVE_C99_SNPRINTF', true)
   glib_conf.set('HAVE_C99_VSNPRINTF', true)
   glib_conf.set('HAVE_UNIX98_PRINTF', true)
@@ -1567,10 +1570,10 @@ g_sizet_compatibility = {
   'long long': sizet_size == long_long_size,
 }
 
-# Do separate checks for gcc/clang (and ignore other compilers for now), since
-# we need to explicitly pass -Werror to the compilers.
+# Do separate checks for gcc/clang/emscripten (and ignore other compilers for now),
+# since we need to explicitly pass -Werror to the compilers.
 # FIXME: https://github.com/mesonbuild/meson/issues/5399
-if cc.get_id() == 'gcc' or cc.get_id() == 'clang'
+if cc.get_id() == 'gcc' or cc.get_id() == 'clang' or cc.get_id() == 'emscripten'
   foreach type_name, size_compatibility : g_sizet_compatibility
     g_sizet_compatibility += { type_name: size_compatibility and
       cc.compiles(
@@ -1655,6 +1658,8 @@ glibconfig_conf.set('gssizebits', ssizet_size * 8)
 # XXX: https://gitlab.gnome.org/GNOME/glib/issues/1413
 if host_system == 'windows'
   g_module_suffix = 'dll'
+elif host_system == 'emscripten'
+  g_module_suffix = 'wasm'
 else
   g_module_suffix = 'so'
 endif
@@ -1861,8 +1866,8 @@ atomicdefine = '''
 # We know that we can always use real ("lock free") atomic operations with MSVC
 if cc.get_id() == 'msvc' or cc.get_id() == 'clang-cl' or cc.links(atomictest, name : 'atomic ops')
   have_atomic_lock_free = true
-  if cc.get_id() == 'gcc' and not cc.compiles(atomicdefine, name : 'atomic ops define')
-    # Old gcc release may provide
+  if (cc.get_id() == 'gcc' or host_system == 'emscripten') and not cc.compiles(atomicdefine, name : 'atomic ops define')
+    # gcc (some old releases) or Emscripten provides
     # __sync_bool_compare_and_swap but doesn't define
     # __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
     glib_conf.set('__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4', true)
@@ -2009,40 +2014,6 @@ if host_system == 'windows'
   libiconv = []
 else
   libiconv = dependency('iconv')
-endif
-
-pcre2 = dependency('libpcre2-8', version: '>= 10.32', required : false)
-if not pcre2.found()
-  if cc.get_id() == 'msvc' or cc.get_id() == 'clang-cl'
-  # MSVC: Search for the PCRE2 library by the configuration, which corresponds
-  # to the output of CMake builds of PCRE2.  Note that debugoptimized
-  # is really a Release build with .PDB files.
-    if vs_crt == 'debug'
-      pcre2 = cc.find_library('pcre2d-8', required : false)
-    else
-      pcre2 = cc.find_library('pcre2-8', required : false)
-    endif
-  endif
-endif
-
-# Try again with the fallback
-if not pcre2.found()
-  pcre2 = dependency('libpcre2-8', required : true, fallback : ['pcre2', 'libpcre2_8'])
-  use_pcre2_static_flag = true
-elif host_system == 'windows'
-  pcre2_static = cc.links('''#define PCRE2_STATIC
-                             #define PCRE2_CODE_UNIT_WIDTH 8
-                             #include <pcre2.h>
-                             int main() {
-                               void *p = NULL;
-                               pcre2_code_free(p);
-                               return 0;
-                             }''',
-                         dependencies: pcre2,
-                         name : 'Windows system PCRE2 is a static build')
-  use_pcre2_static_flag = pcre2_static
-else
-  use_pcre2_static_flag = false
 endif
 
 # Import the gvdb sources as a subproject to avoid having the copylib in-tree
@@ -2357,7 +2328,6 @@ subdir('gobject')
 subdir('gthread')
 subdir('gmodule')
 subdir('gio')
-subdir('fuzzing')
 
 # xgettext is optional (on Windows for instance)
 if find_program('xgettext', required : get_option('nls')).found()

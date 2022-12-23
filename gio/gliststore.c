@@ -68,7 +68,8 @@ enum
   N_PROPERTIES
 };
 
-static void g_list_store_iface_init (GListModelInterface *iface);
+static void g_list_store_iface_init (GListModelInterface *iface,
+                                     gpointer             iface_data);
 
 G_DEFINE_TYPE_WITH_CODE (GListStore, g_list_store, G_TYPE_OBJECT,
                          G_IMPLEMENT_INTERFACE (G_TYPE_LIST_MODEL, g_list_store_iface_init));
@@ -229,7 +230,8 @@ g_list_store_get_item (GListModel *list,
 }
 
 static void
-g_list_store_iface_init (GListModelInterface *iface)
+g_list_store_iface_init (GListModelInterface *iface,
+                         gpointer             iface_data)
 {
   iface->get_item_type = g_list_store_get_item_type;
   iface->get_n_items = g_list_store_get_n_items;

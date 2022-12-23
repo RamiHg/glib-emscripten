@@ -62,8 +62,10 @@
 
 #ifdef G_OS_UNIX
 #include <unistd.h>
+#ifndef G_PLATFORM_WASM
 #include "glib-unix.h"
-#endif
+#endif /*!G_PLATFORM_WASM*/
+#endif /*G_OS_UNIX*/
 
 #include "glib-private.h"
 
@@ -1944,7 +1946,7 @@ _g_local_file_info_get (const char             *basename,
   if (stat_ok)
     set_info_from_stat (info, &statbuf, attribute_matcher);
 
-#ifdef G_OS_UNIX
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
   if (stat_ok && _g_local_file_is_lost_found_dir (path, _g_stat_dev (&statbuf)))
     g_file_info_set_is_hidden (info, TRUE);
 #endif

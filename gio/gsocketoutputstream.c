@@ -46,14 +46,16 @@ struct _GSocketOutputStreamPrivate
   gsize count;
 };
 
-static void g_socket_output_stream_pollable_iface_init (GPollableOutputStreamInterface *iface);
-#ifdef G_OS_UNIX
-static void g_socket_output_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface);
+static void g_socket_output_stream_pollable_iface_init (GPollableOutputStreamInterface *iface,
+                                                        gpointer                        iface_data);
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
+static void g_socket_output_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface,
+                                                                     gpointer                   iface_data);
 #endif
 
 #define g_socket_output_stream_get_type _g_socket_output_stream_get_type
 
-#ifdef G_OS_UNIX
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
 G_DEFINE_TYPE_WITH_CODE (GSocketOutputStream, g_socket_output_stream, G_TYPE_OUTPUT_STREAM,
                          G_ADD_PRIVATE (GSocketOutputStream)
 			 G_IMPLEMENT_INTERFACE (G_TYPE_POLLABLE_OUTPUT_STREAM, g_socket_output_stream_pollable_iface_init)
@@ -223,7 +225,7 @@ g_socket_output_stream_pollable_create_source (GPollableOutputStream *pollable,
   return pollable_source;
 }
 
-#ifdef G_OS_UNIX
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
 static int
 g_socket_output_stream_get_fd (GFileDescriptorBased *fd_based)
 {
@@ -254,16 +256,18 @@ g_socket_output_stream_class_init (GSocketOutputStreamClass *klass)
 							G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
-#ifdef G_OS_UNIX
+#if defined(G_OS_UNIX) && !defined(G_PLATFORM_WASM)
 static void
-g_socket_output_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface)
+g_socket_output_stream_file_descriptor_based_iface_init (GFileDescriptorBasedIface *iface,
+                                                         gpointer                   iface_data)
 {
   iface->get_fd = g_socket_output_stream_get_fd;
 }
 #endif
 
 static void
-g_socket_output_stream_pollable_iface_init (GPollableOutputStreamInterface *iface)
+g_socket_output_stream_pollable_iface_init (GPollableOutputStreamInterface *iface,
+                                            gpointer                        iface_data)
 {
   iface->is_writable = g_socket_output_stream_pollable_is_writable;
   iface->create_source = g_socket_output_stream_pollable_create_source;
