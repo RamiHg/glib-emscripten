@@ -9,14 +9,43 @@ The bulk of the work was done by @kleisauke in their excellent patch
 
 This branch adds even more fixes and re-enables more components (like gregex).
 
+## Prerequisites
+
+It is helpful to have a common installation prefix for Emscripten libraries. You can then set
+`PKG_CONFIG_PATH` to point to that directory's `lib/pkgconfig`. Packages can then reference each
+other seamlessly during compilation.
+
+The build instructions below install Emscripten libraries in `$HOME/emlib`.
+
+> The build instructions also enable `WASM_BIGINT` by default. Remove references to `-sWASM_BIGINT`
+> if you do not want to have it enabled.
+
+### PCRE2
+
+```sh
+git clone https://github.com/PCRE2Project/pcre2.git --branch pcre2-10.41
+cd pcre2
+./autogen.sh
+emconfigure ./configure --prefix="$HOME/emlib" CFLAGS="-pthread -O3" LDFLAGS="-pthread -O3 -sWASM_BIGINT" --disable-shared
+make -j$(nproc) install
+```
+
+### zlib, libffi
+
+TODO: Write simple instructions once the zlib fork is ready. For now, just follow the instructions
+in @kleisauke's gist linked above.
+
 ## Building
 
-First, setup the project: choose an install directory, only build the static version of the library,
-reference the Meson [cross-file](emscripten-crossfile.meson), and disable some unnecessary
+First, setup the project. Use the `$HOME/emlib` directory that we've used to install dependencies as
+both the target directory, and the `pkgconfig` path. Then, only build the static version of the
+library, reference the Meson [cross-file](emscripten-crossfile.meson), and disable some unnecessary
 components.
 
 ```sh
-meson setup _build --prefix="path/to/install/dir" \
+export EM_PKG_CONFIG_PATH="$HOME/emlib/lib/pkconfig"
+CFLAGS="pthread -O3" LDFLAGS="-pthread -O3 -sWASM_BIGINT" meson setup _build \
+    --prefix="HOME/emlib" \
     --cross-file=./emscripten-crossfile.meson \
     --default-library=static \
     --buildtype=release \
@@ -25,7 +54,7 @@ meson setup _build --prefix="path/to/install/dir" \
     -Dtests=false -Dglib_assert=false -Dglib_checks=false
 ```
 
-Then, build and install GLib to your target directory:
+Finally, build and install GLib to your target directory:
 
 ```sh
 meson install -C _build
