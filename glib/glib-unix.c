@@ -30,6 +30,7 @@
 
 #include "glib-unix.h"
 #include "gmain-internal.h"
+#include "gmessages.h"
 
 #include <string.h>
 #include <sys/types.h>
@@ -173,11 +174,11 @@ g_unix_set_fd_nonblocking (gint       fd,
 #else
       fcntl_flags |= O_NDELAY;
 #endif
-    }
+   }
   else
     {
 #ifdef __EMSCRIPTEN__
-      ferror("Cannot create blocking pipes in Emscripten.\n");
+      g_error("Cannot create blocking pipes in Emscripten.\n");
       abort();
 #endif
 #ifdef O_NONBLOCK
