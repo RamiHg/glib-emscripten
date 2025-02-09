@@ -132,17 +132,20 @@ g_poll (GPollFD *fds,
 #ifdef __EMSCRIPTEN__
   // Emscripten does not have synchronous polling capabilities. So we simulate
   // it here.
+  const gboolean has_asyncify = emscripten_has_asyncify();
   if (timeout != 0) {
     gint remaining_timeout = timeout;
+    gint time_to_wait = 1;
     do {
       gint result = poll ((struct pollfd *)fds, nfds, 0);
       // Either error-out immediately, or if we have results, return them now.
       if (result != 0) return result;
       // Otherwise, there is no data (yet). Sleep for a millisecond (smallest
       // granularity).
-      // TODO: Check for pthreads, if so, can probably do a smaller granularity.
-      emscripten_thread_sleep(1);
-      remaining_timeout -= 1;
+      time_to_wait = MIN(time_to_wait * 2, MIN(remaining_timeout, 8));
+      if (has_asyncify) emscripten_sleep(time_to_wait);
+      else emscripten_thread_sleep(time_to_wait);
+      remaining_timeout -= time_to_wait;
     } while (remaining_timeout > 0 || timeout < 0);
     // We've waited all we can.
     return 0;

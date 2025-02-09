@@ -113,6 +113,48 @@ g_wakeup_free (GWakeup *wakeup)
 
 #include "glib-unix.h"
 
+#if defined __EMSCRIPTEN_PTHREADS__
+#include <emscripten/threading.h>
+
+struct _GWakeup {
+  volatile uint32_t   sem;
+};
+
+GWakeup *
+g_wakeup_new (void)
+{
+  GWakeup* wakeup = g_slice_new(GWakeup);
+  wakeup->sem = 0;
+  return wakeup;
+}
+
+void
+g_wakeup_get_pollfd (GWakeup *wakeup,
+                     GPollFD *poll_fd)
+{
+  poll_fd->fd = (gintptr) wakeup;
+  poll_fd->events = G_IO_IN;
+}
+
+void
+g_wakeup_acknowledge (GWakeup *wakeup)
+{
+  // emscripten_semaphore_try_acquire(&wakeup->sem, INT32_MAX);
+}
+
+void
+g_wakeup_signal (GWakeup *wakeup)
+{
+  // emscripten_semaphore_release(&wakeup->sem, INT32_MAX);
+}
+
+void
+g_wakeup_free (GWakeup *wakeup)
+{
+  g_slice_free(GWakeup, wakeup);
+}
+
+#else
 #include <emscripten/wasm_worker.h>
 
 struct _GWakeup {
@@ -152,6 +194,7 @@ g_wakeup_free (GWakeup *wakeup)
 {
   g_slice_free(GWakeup, wakeup);
 }
+#endif
 
 #else
 
